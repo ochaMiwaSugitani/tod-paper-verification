@@ -3,14 +3,14 @@
 
 論文の 4.5.1 節（アルゴリズム実装の妥当性検証）の「検証A」に対応するテストコード．
 
-本実装のタプルエンコーディングが PrefixSpan-py のコアロジックを破壊しないことを
+本実装（時間を考慮）が PrefixSpan-py のコアロジックを破壊しないことを
 示すため，SPMF プロジェクトが提供する公開ベンチマークデータセットである
 Sign データに対して，以下の 2 つの出力が一致するかを検証する：
   (1) PrefixSpan-py に生のアイテム列を入力した結果
   (2) 各アイテムを (0, item) のタプルとしてエンコードし PrefixSpan-py に
       入力した結果（時間情報を中立化）
 
-両者の出力パターン集合が完全に一致することで，本実装のタプルエンコーディング方式が
+両者の出力パターン集合が完全に一致することで，本実装（時間を考慮）が
 PrefixSpan-py のコアロジックと等価であることが確認できる．
 
 実行方法:
@@ -67,8 +67,8 @@ def run_standard_prefixspan(sequences, minsup, closed=True):
     return patterns
 
 
-def run_tuple_encoded_prefixspan(sequences, minsup, closed=True):
-    """本実装のタプルエンコーディング方式を時間中立条件で実行する．
+def run_time_aware_prefixspan(sequences, minsup, closed=True):
+    """本実装（時間を考慮）を時間中立条件で実行する．
 
     本実装は (d, a) タプル（経過日数 d，医療指示種類 a）をアイテムとして扱う．
     時間情報の影響を中立化するため，すべてのアイテムを (0, item) として
@@ -87,7 +87,7 @@ def normalize_standard_pattern(pattern):
     return tuple(pattern)
 
 
-def normalize_tuple_pattern(pattern):
+def normalize_time_aware_pattern(pattern):
     """本実装のパターンから時間情報を除去してハッシュ可能な形式に変換する．
 
     [(0, item1), (0, item2), ...] -> (item1, item2, ...)
@@ -95,26 +95,26 @@ def normalize_tuple_pattern(pattern):
     return tuple(item for (_, item) in pattern)
 
 
-def compare_results(standard_results, tuple_results):
+def compare_results(standard_results, time_aware_results):
     """両者の出力を比較し，等価性を検証する．"""
     standard_set = {
         (normalize_standard_pattern(p), s) for s, p in standard_results
     }
-    tuple_set = {
-        (normalize_tuple_pattern(p), s) for s, p in tuple_results
+    time_aware_set = {
+        (normalize_time_aware_pattern(p), s) for s, p in time_aware_results
     }
 
-    only_in_standard = standard_set - tuple_set
-    only_in_tuple = tuple_set - standard_set
-    common = standard_set & tuple_set
+    only_in_standard = standard_set - time_aware_set
+    only_in_time_aware = time_aware_set - standard_set
+    common = standard_set & time_aware_set
 
     return {
         'standard_count': len(standard_set),
-        'tuple_count': len(tuple_set),
+        'time_aware_count': len(time_aware_set),
         'common_count': len(common),
         'only_in_standard_count': len(only_in_standard),
-        'only_in_tuple_count': len(only_in_tuple),
-        'is_equivalent': (len(only_in_standard) == 0 and len(only_in_tuple) == 0),
+        'only_in_time_aware_count': len(only_in_time_aware),
+        'is_equivalent': (len(only_in_standard) == 0 and len(only_in_time_aware) == 0),
     }
 
 
@@ -125,7 +125,7 @@ def format_result_line(minsup, comparison):
     return (
         f"  minSup={minsup:>4}  | "
         f"標準 PrefixSpan-py: {comparison['standard_count']:>5} 個  | "
-        f"本実装（タプル）: {comparison['tuple_count']:>5} 個  | "
+        f"本実装（時間を考慮）: {comparison['time_aware_count']:>5} 個  | "
         f"共通: {comparison['common_count']:>5} 個  | "
         f"等価性: {'OK（一致）' if comparison['is_equivalent'] else 'NG（不一致）'}"
     )
@@ -173,11 +173,11 @@ def main():
         # 標準 PrefixSpan-py の実行
         standard_results = run_standard_prefixspan(sequences, minsup, closed=True)
 
-        # 本実装（タプルエンコーディング方式）の実行
-        tuple_results = run_tuple_encoded_prefixspan(sequences, minsup, closed=True)
+        # 本実装（時間を考慮）の実行
+        time_aware_results = run_time_aware_prefixspan(sequences, minsup, closed=True)
 
         # 比較
-        comparison = compare_results(standard_results, tuple_results)
+        comparison = compare_results(standard_results, time_aware_results)
         if not comparison['is_equivalent']:
             all_equivalent = False
 
@@ -189,7 +189,7 @@ def main():
     output_lines.append("")
     if all_equivalent:
         output_lines.append("[総合判定] すべての minSup 設定において出力が完全一致した．")
-        output_lines.append("           これにより本実装（タプルエンコーディング方式）が")
+        output_lines.append("           これにより本実装（時間を考慮）が")
         output_lines.append("           PrefixSpan-py のコアロジックと等価であることが客観的に示された．")
     else:
         output_lines.append("[総合判定] 一部の minSup 設定で出力に差異が確認された．実装の確認が必要．")
